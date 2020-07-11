@@ -1,0 +1,94 @@
+---
+title: "ANZ EDA"
+output: html_notebook
+---
+## Load data
+
+```{r}
+data <- readxl::read_xlsx("F:/ANZ synthesised transaction dataset.xlsx")
+head(data)
+```
+## Column names
+```{r}
+names(data)
+```
+## Diagnose dataset
+```{r}
+library(dlookr)
+diagnose(data)
+
+```
+Convert variables that should be factors to factors
+```{r}
+data$status <- as.factor(data$status)
+data$card_present_flag <- as.factor(data$card_present_flag)
+data$country <- as.factor(data$country)
+```
+
+## Exploratory Data Analysis
+### Spending by location
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+x <- data[data$movement==c("debit"),] %>%
+  select(transaction_id, long_lat) %>%
+  mutate(s = strsplit(long_lat, " ")) %>%
+  mutate(s = purrr::map(s, setNames, c("Longitude", "Latitude"))) %>%
+  unnest_wider(s)
+  
+library(rworldmap)
+newmap <- getMap(resolution = "high")
+# plot map
+plot(newmap, xlim = c(112,155), ylim = c(-40, -10), 
+     border = "darkgray", 
+     col = "wheat2", bg = "gray95")
+points(x$Longitude, x$Latitude, col = alpha("red",.01), pch =20, cex = 1 )
+    
+```
+Transactions are mostly concentrated to the Eastern coast and western coast. Expanding along the coast should be looked into as well as increasing marketing in these regions.
+
+### Spending by age
+```{r}
+Total_Traxcn <- aggregate(data[data$movement==c("debit"),]$amount, by = list(Age=data[data$movement==c("debit"),]$age), FUN = sum)
+ggplot(Total_Traxcn, aes(y = x, x =Age)) + geom_col() + ylab("Total Amounts Transacted by Age")
+```
+```{r}
+sum(Total_Traxcn[Total_Traxcn$Age<=30,]$x)/sum(Total_Traxcn$x)
+```
+```{r}
+sum(Total_Traxcn[(Total_Traxcn$Age>30 & Total_Traxcn$Age<50),]$x)/sum(Total_Traxcn$x)
+
+```
+53 percent of transactions are done by people under the age of 30 whilst 43 percent are people between 30 and 50.
+Thus, this demographic is a key domegraphic and efforts should be made towards engaging users to expand users belonging to this demographic.
+
+
+### Account Balance by Age 
+```{r}
+ggplot(data, aes(y = balance, x  = age)) + geom_boxplot(aes(group = age))
+```
+Average balance increases with age. Middle aged demographics can be targeted for investing these funds into mutual funds.
+
+### Payments by Day
+```{r}
+library(lubridate)
+data$weekday <- wday(data$extraction)
+data$monthday <- mday(data$extraction)
+weekday <- data[data$movement==c("debit"),] %>% 
+  select(amount)%>%
+  aggregate(by=list(data[data$movement==c("debit"),]$weekday), FUN = mean)
+monthday <- data[data$movement==c("debit"),] %>% 
+  select(amount)%>%
+  aggregate(by=list(data[data$movement==c("debit"),]$monthday), FUN = mean)
+par(mfrow=c(1,2))
+plot(x = weekday$Group.1, y = weekday$amount, xlab= c("Day of The Week"), ylab = c("Average Amount Spent"), 'l')
+
+plot(x = monthday$Group.1, y = monthday$amount, xlab= c("Day of The Month"), ylab = c("Average Amount Spent"), 'l')
+
+```
+People spend the least on Saturdays and expenditure increases towards the middle of the month.
+
+
+
